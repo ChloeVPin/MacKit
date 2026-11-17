@@ -105,3 +105,72 @@ let contents: [String: Any] = ["images": images, "info": ["author": "xcode", "ve
 try JSONSerialization.data(withJSONObject: contents, options: [.prettyPrinted, .sortedKeys])
     .write(to: outputFolder.appending(path: "Contents.json"))
 print("Wrote \(images.count) icon sizes to \(outputFolder.path())")
+
+// MARK: Liquid Glass
+
+// The layered icon macOS 26 and later draws with Liquid Glass: the system
+// supplies the tile's shape, glass edges, shadows, and the dark, clear, and
+// tinted looks. Each layer is the bare artwork on a full 1024 canvas.
+let layered = URL(filePath: "MacKit/AppIcon.icon")
+try FileManager.default.createDirectory(at: layered.appending(path: "Assets"), withIntermediateDirectories: true)
+
+func layer(lit wanted: Int) -> Data {
+    let rep = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: 1024, pixelsHigh: 1024, bitsPerSample: 8, samplesPerPixel: 4,
+        hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+    )!
+    let graphics = NSGraphicsContext(bitmapImageRep: rep)!
+    let context = graphics.cgContext
+    let space = CGColorSpace(name: CGColorSpace.sRGB)!
+    // The same grid as the flat icon, scaled from its 824pt tile to the
+    // full canvas.
+    let scale: CGFloat = 1024 / 824
+    let cell = 100 * scale, gap = 28 * scale
+    let grid = cell * 5 + gap * 4
+    let origin = (1024 - grid) / 2
+    let ember = CGGradient(colorsSpace: space, colors: [
+        CGColor(srgbRed: 1.0, green: 0.56, blue: 0.22, alpha: 1),
+        CGColor(srgbRed: 0.93, green: 0.33, blue: 0.04, alpha: 1),
+    ] as CFArray, locations: [0, 1])!
+    for (row, cells) in pattern.enumerated() {
+        for (column, lit) in cells.enumerated() where lit == wanted {
+            let rect = CGRect(
+                x: origin + CGFloat(column) * (cell + gap), y: origin + CGFloat(4 - row) * (cell + gap),
+                width: cell, height: cell
+            )
+            context.saveGState()
+            context.addPath(CGPath(roundedRect: rect, cornerWidth: 25 * scale, cornerHeight: 25 * scale, transform: nil))
+            if lit == 1 {
+                context.clip()
+                context.drawLinearGradient(ember, start: CGPoint(x: rect.midX, y: rect.maxY), end: CGPoint(x: rect.midX, y: rect.minY), options: [])
+            } else {
+                context.setFillColor(CGColor(gray: 1, alpha: 0.085))
+                context.fillPath()
+            }
+            context.restoreGState()
+        }
+    }
+    graphics.flushGraphics()
+    return rep.representation(using: .png, properties: [:])!
+}
+
+try layer(lit: 1).write(to: layered.appending(path: "Assets/changed.png"))
+try layer(lit: 0).write(to: layered.appending(path: "Assets/stock.png"))
+
+func group(_ image: String, glass: Bool) -> [String: Any] {
+    [
+        "layers": [["glass": glass, "image-name": image, "name": image.replacingOccurrences(of: ".png", with: "")]],
+        "shadow": ["kind": "neutral", "opacity": glass ? 0.5 : 0],
+        "specular": glass,
+        "translucency": ["enabled": false, "value": 0.5],
+    ]
+}
+let document: [String: Any] = [
+    "fill": ["solid": "srgb:0.12500,0.12500,0.13700,1.00000"],
+    // Front to back: the changed cells are glass, the stock cells are flat.
+    "groups": [group("changed.png", glass: true), group("stock.png", glass: false)],
+    "supported-platforms": ["squares": ["macOS"]],
+]
+try JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys])
+    .write(to: layered.appending(path: "icon.json"))
+print("Wrote the Liquid Glass icon to \(layered.path())")

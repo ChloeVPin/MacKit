@@ -1,12 +1,40 @@
+<div align="center">
+
+<img src="MacKit/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="112" alt="MacKit icon">
+
 # MacKit
 
-A native macOS app for setting up and tuning a Mac. Pick the settings you want, review them together, and apply them in one step. Every change is recorded and can be undone.
+**Tune your Mac from one calm window.**
+412 macOS settings with plain-language names, a review step, and exact undo.<br>
+Plus an app store that installs straight from the maker.
 
-Built with Swift 6 and SwiftUI for macOS 27.
+[Features](#features) · [Build](#build) · [Try it safely](#try-it-safely) · [How it stays safe](#how-it-stays-safe) · [Status](#status)
 
-## Run it
+<br>
 
-Open `MacKit.xcodeproj` in Xcode 27 and press Run. Or build from Terminal:
+<img src="Docs/dock-dark.png" width="820" alt="MacKit's Dock settings page in dark mode, with two pending changes waiting for review">
+
+</div>
+
+## Features
+
+- **412 settings in 18 categories.** Finder, Dock, Mission Control, menu bar, keyboard, trackpad, screenshots, power, sharing, and more. Each one is checked against macOS 27.
+- **Plain words.** "Show hidden files", not `AppleShowAllFiles`. The Terminal command behind any change is one click away if you want it.
+- **Review before anything risky.** Small, safe settings apply as you change them. Anything that needs a password, carries a caution, or restarts Finder waits in a review sheet first.
+- **Exact undo.** MacKit records the previous value before every write. History puts it back, one change or a whole batch.
+- **Quick Setups.** Developer, Calm Dock, Power Finder, and Clean Captures apply a handful of related changes together, always through review.
+- **An app store.** About 3,500 apps from Homebrew Cask's public catalog, downloaded from the maker, checksum-verified, and checked by macOS before they reach Applications. Homebrew itself is not needed.
+- **Native.** SwiftUI and AppKit, system controls, Liquid Glass icon. No web views, no third-party UI.
+
+<div align="center">
+<img src="Docs/home.png" width="820" alt="MacKit's Home page with four Quick Setups">
+</div>
+
+## Build
+
+MacKit needs macOS 27 and Xcode 27. There is no downloadable release yet.
+
+Open `MacKit.xcodeproj` and press Run, or build from Terminal:
 
 ```bash
 xcodebuild -project MacKit.xcodeproj -scheme MacKit -derivedDataPath build build
@@ -16,7 +44,7 @@ xcodebuild -project MacKit.xcodeproj -scheme MacKit -derivedDataPath build build
 open build/Build/Products/Debug/MacKit.app
 ```
 
-### Try it without touching your Mac
+## Try it safely
 
 Sample mode runs the whole app, including applying and undoing, against an in-memory Mac. No real setting is read or written.
 
@@ -24,30 +52,22 @@ Sample mode runs the whole app, including applying and undoing, against an in-me
 open build/Build/Products/Debug/MacKit.app --args -sample 1
 ```
 
-Other values: `-sample empty` (a factory-fresh Mac) and `-sample worst` (very long text and failed changes, for checking the layout). See `MacKit/App/SampleData.swift` for the rest.
+## How it stays safe
 
-## How it works
+- **Only known settings.** The catalog is a fixed list in the source. MacKit never downloads or runs scripts, and it can only launch a short allowlist of system tools.
+- **Your password stays with macOS.** Administrator changes go through the system's own prompt, once per batch. One failed change never stops or hides the others.
+- **Downloads are treated as untrusted.** HTTPS only, checksum verified when the catalog has one, marked as downloaded, and confirmed by Gatekeeper before anything in Applications is replaced. The copy being replaced goes to the Trash, not away.
+- **Everything is in the open.** Every setting, the command it runs, and the tests behind it are in this repository.
 
-- **Nothing changes until you apply.** Flipping a switch marks a pending change. The review sheet lists every change, and the Terminal command behind each one if you ask for it.
-- **Everything can be undone.** Before a setting is written, MacKit records its exact prior value. History puts it back.
-- **Only known settings.** The catalog is a fixed list of about 400 macOS settings, each checked against the current system. MacKit never downloads or runs scripts, and it can only launch a short allowlist of system tools.
-- **Administrator changes use the system prompt.** Power, sharing, login, update, and firewall settings ask macOS for a password once per batch. MacKit never sees it.
-
-## Layout
+## Project layout
 
 ```
-MacKit/                    The app (SwiftUI)
-  App/                     Entry point, app state, sample data
-  DesignSystem/            Spacing, type, and shared components
-  Features/                Home, settings pages, review sheet, history
-Packages/MacKitCore/       The engine. No UI, fully unit tested
-  Catalog/                 Every setting and quick setup, as data
-  Engine/                  Reads state, plans changes, applies and undoes them
-  System/                  Access to preferences and commands, plus an in-memory fake
-Tools/make-icon.swift      Draws the app icon
+MacKit/                  The app (SwiftUI)
+Packages/MacKitCore/     The engine: catalog, planning, apply, undo, installer. No UI.
+Tools/make-icon.swift    Draws the app icon
 ```
 
-Run the engine's tests:
+Run the engine's tests. They use an in-memory Mac and locally built fake apps, so nothing real is touched:
 
 ```bash
 swift test --package-path Packages/MacKitCore
@@ -55,4 +75,14 @@ swift test --package-path Packages/MacKitCore
 
 ## Status
 
-Early. The app is unsigned, so macOS will warn on first launch of a downloaded copy. Changes that need an administrator password have been tested against the in-memory fake only, not on a real Mac.
+Early, and honest about it:
+
+- **Unsigned.** There is no Developer ID yet, so macOS will warn on first launch of a copied build.
+- **Administrator changes** are tested on a real system for power settings and system preference files. Touch ID for sudo has not been confirmed end to end.
+- **The app store** is tested with locally built apps only.
+
+Issues and pull requests are welcome. `PLAN.md` has the full history and what comes next.
+
+## License
+
+[MIT](LICENSE)
