@@ -1,8 +1,11 @@
 <div align="center">
 
-<img src="MacKit/Assets.xcassets/AppIcon.appiconset/icon_128x128@2x.png" width="112" alt="MacKit icon">
-
-# MacKit
+<h1>
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="Docs/wordmark-dark.png">
+<img src="Docs/wordmark-light.png" width="300" alt="MacKit">
+</picture>
+</h1>
 
 **Tune your Mac from one calm window.**
 412 macOS settings with plain-language names, a review step, and exact undo.<br>
@@ -64,7 +67,8 @@ open build/Build/Products/Debug/MacKit.app --args -sample 1
 ```
 MacKit/                  The app (SwiftUI)
 Packages/MacKitCore/     The engine: catalog, planning, apply, undo, installer. No UI.
-Tools/make-icon.swift    Draws the app icon
+Tools/                   Scripts that draw the app icon and the brand images
+Brand/Allo/              The wordmark's font, with its license
 ```
 
 Run the engine's tests. They use an in-memory Mac and locally built fake apps, so nothing real is touched:
@@ -85,4 +89,4 @@ Issues and pull requests are welcome. `PLAN.md` has the full history and what co
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The wordmark is set in [Allo](https://allo.joshpuckett.me) by Josh Puckett, under the SIL Open Font License.
