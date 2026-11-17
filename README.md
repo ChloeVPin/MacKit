@@ -11,7 +11,7 @@
 412 macOS settings with plain-language names, a review step, and exact undo.<br>
 Plus an app store that installs straight from the maker.
 
-[Features](#features) · [Build](#build) · [Try it safely](#try-it-safely) · [How it stays safe](#how-it-stays-safe) · [Status](#status)
+[Features](#features) · [Download](#download) · [Build](#build) · [Try it safely](#try-it-safely) · [How it stays safe](#how-it-stays-safe) · [Status](#status)
 
 <br>
 
@@ -33,9 +33,15 @@ Plus an app store that installs straight from the maker.
 <img src="Docs/home.png" width="820" alt="MacKit's Home page with four Quick Setups">
 </div>
 
+## Download
+
+Get the latest disk image from [Releases](https://github.com/ChloeVPin/MacKit/releases/latest), open it, and drag MacKit into Applications. It needs macOS 27 on a Mac with Apple silicon.
+
+MacKit isn't signed with an Apple Developer ID yet, so the first time you open it macOS will say it can't check the app. Go to **System Settings › Privacy & Security**, find the message about MacKit, and choose **Open Anyway**. You only do this once.
+
 ## Build
 
-MacKit needs macOS 27 and Xcode 27. There is no downloadable release yet.
+Building it yourself needs macOS 27 and Xcode 27.
 
 Open `MacKit.xcodeproj` and press Run, or build from Terminal:
 

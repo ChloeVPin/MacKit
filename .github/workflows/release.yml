@@ -1,0 +1,81 @@
+name: Release
+
+# Push a tag like v0.1.0 and this tests, builds, and publishes it.
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # The same tests and build every push gets, stamped with the tag's version.
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      version: ${{ github.ref_name }}
+
+  # Publishing needs no Mac, so it runs on the quickest runner to start.
+  publish:
+    name: Publish
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write        # create the release
+      id-token: write        # sign the provenance record
+      attestations: write    # store it
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: MacKit-dmg
+          path: dist
+
+      - name: Check the download
+        working-directory: dist
+        run: sha256sum --check *.sha256
+
+      # A public record that this exact file was built by this workflow from
+      # this commit. Anyone can check it: gh attestation verify <file> -R <repo>
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.dmg
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          dmg="$(basename dist/*.dmg)"
+          cat > notes.md <<NOTES
+          ## Install
+
+          1. Download **$dmg** below and open it.
+          2. Drag MacKit into Applications.
+          3. Open MacKit. macOS will say it can't check the app, because MacKit isn't signed with an Apple Developer ID yet. Go to **System Settings › Privacy & Security**, scroll to the message about MacKit, and choose **Open Anyway**. This is needed once.
+
+          Needs macOS 27 on a Mac with Apple silicon.
+
+          ## Check the download
+
+          \`\`\`bash
+          shasum -a 256 -c $dmg.sha256
+          \`\`\`
+
+          \`\`\`bash
+          gh attestation verify $dmg -R $REPO
+          \`\`\`
+
+          The second command confirms the file was built by this repository's workflow from the tagged commit.
+
+          NOTES
+          sed -i 's/^          //' notes.md
+          prerelease=""
+          case "$TAG" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$TAG" dist/* --repo "$REPO" --title "MacKit ${TAG#v}" \
+            --notes-file notes.md --generate-notes --verify-tag $prerelease

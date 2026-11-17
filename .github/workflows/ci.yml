@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "Docs/**", "Brand/**", "Archive/**", "LICENSE"]
+  pull_request:
+    paths-ignore: ["**.md", "Docs/**", "Brand/**", "Archive/**", "LICENSE"]
+  workflow_call:
+    inputs:
+      version:
+        description: Version to stamp into the app, such as 0.1.0 or v0.1.0. Empty keeps the project's own.
+        type: string
+        default: ""
+  workflow_dispatch:
+
+# A newer push to the same branch makes the older run pointless.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Picking Xcode through the environment costs nothing; `xcode-select`
+  # needs sudo and a second or two. Must match the Xcode the app is
+  # developed with: MacKit needs the macOS 27 SDK.
+  DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+
+jobs:
+  # The two jobs share nothing, so they run side by side. The whole run
+  # takes as long as the slower one.
+  test:
+    name: Engine tests
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The tests use an in-memory Mac and locally built fake apps.
+      # Nothing on the runner is changed and nothing is downloaded.
+      - name: Test
+        run: swift test --package-path Packages/MacKitCore --parallel
+
+  build:
+    name: App and disk image
+    runs-on: xcode-27
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Version
+        id: version
+        run: |
+          version="${{ inputs.version }}"
+          version="${version#v}"
+          if [ -z "$version" ]; then
+            version="$(sed -n 's/.*MARKETING_VERSION = \(.*\);/\1/p' MacKit.xcodeproj/project.pbxproj | head -1)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      # There are no outside packages, so there is nothing to fetch or
+      # cache: a clean build is the whole cost. The flags below cut what a
+      # one-off build never uses (the editor's index, package resolution).
+      - name: Build
+        run: |
+          xcodebuild build \
+            -project MacKit.xcodeproj -scheme MacKit -configuration Release \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath build \
+            -disableAutomaticPackageResolution -skipPackageUpdates \
+            -quiet \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            MARKETING_VERSION="${{ steps.version.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}"
+
+      - name: Disk image
+        run: |
+          Tools/make-dmg.sh build/Build/Products/Release/MacKit.app \
+            "dist/MacKit-${{ steps.version.outputs.version }}.dmg"
+          cd dist && shasum -a 256 *.dmg | tee "MacKit-${{ steps.version.outputs.version }}.dmg.sha256"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: MacKit-dmg
+          path: dist/
+          if-no-files-found: error
+          # A disk image is already compressed.
+          compression-level: 0
+          retention-days: 14
