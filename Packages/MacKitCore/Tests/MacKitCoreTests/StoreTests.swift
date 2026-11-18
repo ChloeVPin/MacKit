@@ -400,8 +400,22 @@ import Testing
             p.waitUntilExit()
             let value = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             #expect(p.terminationStatus == 0, "quarantine missing on \(target.lastPathComponent)")
-            #expect(value.hasPrefix("0081;"), "unexpected quarantine value \(value)")
+            #expect(value.hasPrefix("0181;"), "unexpected quarantine value \(value)")
         }
+
+        // macOS must run the installed app from where it was put. A relocated
+        // (translocated) copy is read-only, which breaks apps that update
+        // themselves.
+        let policy = Process()
+        policy.executableURL = URL(filePath: "/usr/bin/security")
+        policy.arguments = ["translocate-policy-check", installedApp.path(percentEncoded: false)]
+        let verdict = Pipe()
+        policy.standardOutput = verdict
+        policy.standardError = verdict
+        try policy.run()
+        policy.waitUntilExit()
+        let answer = String(decoding: verdict.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        #expect(answer.contains("Would not translocate"), "macOS would relocate the installed app: \(answer)")
     }
 
     @Test func `failed multi-bundle update keeps the previous version intact and unwritable Applications fails before download`() async throws {

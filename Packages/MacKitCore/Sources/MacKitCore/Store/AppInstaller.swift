@@ -100,7 +100,13 @@ public struct AppInstaller: Sendable {
         // `tar`, and `hdiutil` propagate Gatekeeper's flag onto read-only
         // files inside the bundle too.
         let stamp = String(Int(Date.now.timeIntervalSince1970), radix: 16)
-        let quarantine = "0081;\(stamp);MacKit;"
+        // 0x0001 and 0x0080 are the ordinary "downloaded, not yet approved"
+        // flags, so Gatekeeper still checks the app the first time it opens.
+        // 0x0100 says the app was put in place by an installer. Without it
+        // macOS runs a quarantined app from a hidden read-only copy (App
+        // Translocation), where its own updater can't write: Discord then
+        // asks to install a helper in a loop.
+        let quarantine = "0181;\(stamp);MacKit;"
         let markedDownload = await Self.run("/usr/bin/xattr", ["-s", "-w", "com.apple.quarantine", quarantine, download.path(percentEncoded: false)])
         guard markedDownload.status == 0 else {
             throw .copyFailed("Couldn't mark the download for macOS security checks.")
