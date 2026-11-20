@@ -24,12 +24,7 @@ struct DiscoverView: View {
             case .loading:
                 PageLoading(label: "Loading apps")
             case .failed(let message):
-                VStack(spacing: Space.m) {
-                    EmptyState(symbol: "wifi.slash", title: "Can't load apps", message: message)
-                    Button("Try Again") { Task { await store.reload() } }
-                        .buttonStyle(PillButtonStyle(isLarge: true))
-                }
-                .frame(maxWidth: .infinity)
+                StoreLoadFailure(message: message)
             case .ready:
                 if !query.isEmpty {
                     results(store.search(query), query: query)
@@ -144,6 +139,22 @@ private struct CategoryBar: View {
     }
 }
 
+/// What a store page shows when the app list couldn't be loaded.
+private struct StoreLoadFailure: View {
+    let message: String
+
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VStack(spacing: Space.m) {
+            EmptyState(symbol: "wifi.slash", title: "Can't load apps", message: message)
+            Button("Try Again") { Task { await model.store.reload() } }
+                .buttonStyle(PillButtonStyle(isLarge: true))
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
 private struct SortMenu: View {
     @Environment(AppModel.self) private var model
 
@@ -179,11 +190,17 @@ struct InstalledAppsView: View {
                 if updates.count > 1 {
                     Button("Update All") { updates.forEach(store.install) }
                         .buttonStyle(PillButtonStyle(isTinted: true, isLarge: true))
+                        // Already updating everything: another click would do nothing.
+                        .disabled(updates.allSatisfy(store.isBusy))
                 }
             }
 
             if store.phase == .loading {
                 PageLoading(label: "Loading apps")
+            } else if case .failed(let message) = store.phase {
+                // Without the list, MacKit can't tell which apps are installed,
+                // so "nothing installed" would be wrong.
+                StoreLoadFailure(message: message)
             } else if apps.isEmpty {
                 EmptyState(
                     symbol: "square.dashed",
@@ -261,9 +278,10 @@ struct AppDetailView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } icon: {
+                    // Orange, like failures everywhere else. Yellow is for cautions.
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(.orange)
                 }
                 .padding(.horizontal, Space.xs)
                 .padding(.top, -Space.m)
@@ -299,8 +317,14 @@ struct AppDetailView: View {
                 HStack(spacing: Space.s) {
                     Button("Show in Finder") { store.showInFinder(app) }
                         .buttonStyle(PillButtonStyle(isLarge: true))
-                    Button("Move to Trash") { store.uninstall(app) }
-                        .buttonStyle(PillButtonStyle(isLarge: true))
+                    Button("Move to Trash") {
+                        do throws(InstallError) {
+                            try store.uninstall(app)
+                        } catch {
+                            model.errorMessage = "“\(app.name)” couldn't be moved to the Trash. \(error.explanation)"
+                        }
+                    }
+                    .buttonStyle(PillButtonStyle(isLarge: true))
                 }
                 .padding(.leading, Space.xs)
             }
@@ -363,7 +387,7 @@ struct AppCard: View {
         let failure = failureMessage
         HStack(spacing: Space.m) {
             Button {
-                model.store.openAppID = app.id
+                model.openApp(app.id)
             } label: {
                 HStack(spacing: Space.m) {
                     AppIcon(app: app, size: 48)
@@ -390,9 +414,9 @@ struct AppCard: View {
         .overlay { shape.strokeBorder(.primary.opacity(contrast == .increased ? 0.28 : 0.06), lineWidth: 1) }
         .contentShape(shape)
         .onHover { isHovered = $0 }
-        .onTapGesture { model.store.openAppID = app.id }
+        .onTapGesture { model.openApp(app.id) }
         .accessibilityElement(children: .contain)
-        .accessibilityAction(named: "Show Details") { model.store.openAppID = app.id }
+        .accessibilityAction(named: "Show Details") { model.openApp(app.id) }
     }
 
     private var failureMessage: String? {
@@ -412,7 +436,7 @@ struct AppRow: View {
         let failure = failureMessage(store)
         HStack(spacing: Space.m) {
             Button {
-                store.openAppID = app.id
+                model.openApp(app.id)
             } label: {
                 HStack(spacing: Space.m) {
                     AppIcon(app: app, size: 36)
@@ -437,7 +461,7 @@ struct AppRow: View {
                 .font(.system(size: 9, weight: .semibold))
                 .foregroundStyle(.tertiary)
                 .contentShape(.rect)
-                .onTapGesture { store.openAppID = app.id }
+                .onTapGesture { model.openApp(app.id) }
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, Layout.cardInset)
@@ -445,9 +469,9 @@ struct AppRow: View {
         .background(isHovered ? Color.rowHover : Color.clear)
         .contentShape(.rect)
         .onHover { isHovered = $0 }
-        .onTapGesture { store.openAppID = app.id }
+        .onTapGesture { model.openApp(app.id) }
         .accessibilityElement(children: .contain)
-        .accessibilityAction(named: "Show Details") { store.openAppID = app.id }
+        .accessibilityAction(named: "Show Details") { model.openApp(app.id) }
     }
 
     private func failureMessage(_ store: StoreModel) -> String? {
@@ -601,7 +625,7 @@ struct GetButton: View {
                     ProgressPill(fraction: fraction, width: width, height: height, isLarge: isLarge)
                 }
                 .buttonStyle(.plain)
-                .help("Click to stop")
+                .help("Stop downloading")
                 .accessibilityLabel("Downloading \(app.name)")
                 .accessibilityValue(fraction.map { "\(Int($0 * 100)) percent" } ?? "")
                 .accessibilityHint("Stops the download")

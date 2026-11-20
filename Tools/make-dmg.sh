@@ -14,7 +14,14 @@ dmg="${2:?output .dmg path}"
 codesign --verify --deep --strict "$app"
 
 stage="$(mktemp -d)"
-trap 'rm -rf "$stage"' EXIT
+mount=""
+# Runs on any exit, so a failed check never leaves the image attached.
+cleanup() {
+    [ -z "$mount" ] || hdiutil detach -quiet -force "$mount" 2>/dev/null || true
+    [ -z "$mount" ] || rmdir "$mount" 2>/dev/null || true
+    rm -rf "$stage"
+}
+trap cleanup EXIT
 
 # ditto keeps the signature, extended attributes, and symlinks intact.
 ditto "$app" "$stage/MacKit.app"
@@ -32,5 +39,6 @@ codesign --verify --deep --strict "$mount/MacKit.app"
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$mount/MacKit.app/Contents/Info.plist")"
 hdiutil detach -quiet "$mount"
 rmdir "$mount" 2>/dev/null || true
+mount=""
 
 echo "Made $dmg (MacKit $version, $(du -h "$dmg" | cut -f1 | tr -d ' '))"

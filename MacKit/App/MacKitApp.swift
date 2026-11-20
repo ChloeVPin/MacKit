@@ -52,20 +52,25 @@ struct MacKitApp: App {
                 Divider()
             }
             CommandMenu("Changes") {
+                // Both wait while a review is open: the sheet already holds
+                // its own copy of the changes.
                 Button("Review Changes…") {
                     model.beginReview()
                 }
                 .keyboardShortcut(.return)
-                .disabled(model.pending.isEmpty)
+                .disabled(model.pending.isEmpty || model.review != nil)
 
+                // Option-Command-Delete, because Command-Delete belongs to
+                // text fields ("delete to the start of the line"), and a menu
+                // shortcut would take it from the search field.
                 Button("Discard Changes") {
                     model.discardPending()
                 }
-                .keyboardShortcut(.delete)
-                .disabled(model.pending.isEmpty)
+                .keyboardShortcut(.delete, modifiers: [.command, .option])
+                .disabled(model.pending.isEmpty || model.review != nil)
             }
             CommandMenu("Go") {
-                Button("Search Settings") { model.searchFocusRequests += 1 }
+                Button(model.destination.isStore ? "Search Apps" : "Search Settings") { model.searchFocusRequests += 1 }
                     .keyboardShortcut("f")
                 Divider()
                 Button("Home") { model.go(to: .home) }

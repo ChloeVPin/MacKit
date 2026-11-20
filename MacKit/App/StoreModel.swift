@@ -377,6 +377,14 @@ final class StoreModel {
 
     func isInstalled(_ app: StoreApp) -> Bool { installed[app.id] != nil }
 
+    /// Whether the app is downloading or installing right now.
+    func isBusy(_ app: StoreApp) -> Bool {
+        switch activity[app.id] {
+        case nil, .failed: false
+        default: true
+        }
+    }
+
     func hasUpdate(_ app: StoreApp) -> Bool {
         installed[app.id].map { isVersion(app.displayVersion, newerThan: $0) } ?? false
     }
@@ -466,14 +474,13 @@ final class StoreModel {
         if case .failed = activity[app.id] { activity[app.id] = nil }
     }
 
-    func uninstall(_ app: StoreApp) {
-        do {
-            try backend.uninstall(app)
-            refreshInstalled()
-            invalidateIcon(for: app.id)
-        } catch {
-            activity[app.id] = .failed(error.explanation)
-        }
+    /// Moves an installed app to the Trash. A failure is thrown rather than
+    /// kept as the app's activity, because a failed install offers Retry,
+    /// and retrying here would install the app again.
+    func uninstall(_ app: StoreApp) throws(InstallError) {
+        try backend.uninstall(app)
+        refreshInstalled()
+        invalidateIcon(for: app.id)
     }
 
     func open(_ app: StoreApp) {

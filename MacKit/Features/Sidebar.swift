@@ -46,7 +46,8 @@ struct Sidebar: View {
         SidebarRow(
             destination: destination,
             pending: destination == .installed ? model.store.updateCount : destination.category.map(model.pendingCount(in:)) ?? 0,
-            isSelected: model.destination == destination && model.searchText.isEmpty
+            // Matches when the window shows search results instead of the page.
+            isSelected: model.destination == destination && model.searchText.trimmingCharacters(in: .whitespaces).isEmpty
         ) {
             model.go(to: destination)
         }
@@ -92,7 +93,7 @@ private struct SidebarRow: View {
                         .background(Color.accentColor, in: .capsule)
                         .contentTransition(.numericText(value: Double(pending)))
                         .transition(reduceMotion ? AnyTransition.opacity : .scale(scale: 0.85).combined(with: .opacity))
-                        .accessibilityLabel(destination == .installed ? "\(pending) updates" : "\(pending) pending")
+                        .accessibilityLabel(destination == .installed ? "\(pending) \(pending == 1 ? "update" : "updates")" : "\(pending) pending")
                 }
             }
             .padding(.horizontal, Space.s)

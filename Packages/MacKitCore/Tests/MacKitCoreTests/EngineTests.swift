@@ -105,6 +105,18 @@ private func tweak(_ id: String) -> Tweak {
         }
     }
 
+    @Test func `every administrator write has a root command`() {
+        // A root write with no command would be skipped yet reported as applied.
+        let (engine, _) = makeEngine()
+        for tweak in Catalog.tweaks(home: home) {
+            for option in tweak.options {
+                for operation in engine.plan([(tweak, option.id)]).changes[0].operations where operation.isPrivileged {
+                    #expect(operation.privilegedCommand != nil, "\(tweak.id) \(option.id): \(operation.commandText)")
+                }
+            }
+        }
+    }
+
     @Test func `preference bindings only name real options`() {
         for tweak in Catalog.tweaks(home: home) {
             guard case .preferences(let bindings) = tweak.mechanism else { continue }
@@ -199,6 +211,21 @@ private func tweak(_ id: String) -> Tweak {
         let (engine, system) = makeEngine()
         try? system.set(.double(0.2), for: "autohide-delay", in: .app("com.apple.dock"))
         #expect(await engine.state(of: tweak("dock.reveal-speed")) == .custom("0.2, not set"))
+    }
+
+    @Test func `numbers no setting can hold read as entered values without crashing`() async throws {
+        let (engine, system) = makeEngine()
+        let recent = tweak("dock.recent-count")
+        for stored in [PreferenceValue.double(.infinity), .double(-.infinity), .double(.nan), .double(1e20)] {
+            try system.set(stored, for: "show-recent-count", in: .app("com.apple.dock"))
+            let id = try #require(await engine.state(of: recent).optionID)
+            #expect(recent.entry(id) == nil, "a whole-number slider can't hold \(stored.displayText)")
+            #expect(!recent.label(for: id).isEmpty)
+        }
+        #expect(PreferenceValue.double(1e20).displayText == "1e+20")
+        #expect(PreferenceValue.double(3).displayText == "3")
+        #expect(PreferenceValue.double(0.5).displayText == "0.5")
+        #expect(recent.entry("=7") == .int(7))
     }
 
     @Test func `multi key tweaks match on every key`() async {
@@ -559,6 +586,25 @@ private func tweak(_ id: String) -> Tweak {
         }
     }
 
+    @Test(.timeLimit(.minutes(1)))
+    func `the live runner reads output larger than a pipe holds`() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: "mackit-pipe-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let big = dir.appending(path: "big.txt")
+        let text = String(repeating: "a line of output that keeps the pipe busy\n", count: 8_000)
+        try Data(text.utf8).write(to: big)
+        // Missing files fill standard error at the same time.
+        let missing = (0..<1_500).map { dir.appending(path: "missing-\($0)").path(percentEncoded: false) }
+
+        let output = try await AllowlistedCommandRunner().run(
+            Command(executable: "/usr/bin/grep", arguments: ["-h", "", big.path(percentEncoded: false)] + missing)
+        )
+        #expect(output.standardOutput == text)
+        #expect(output.standardError.utf8.count > 65_536)
+        #expect(output.exitCode == 2)
+    }
+
     @Test func `touch id for sudo keeps pam syntax and read-only permissions intact`() throws {
         let dir = FileManager.default.temporaryDirectory.appending(path: "mackit-pam-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -786,6 +832,11 @@ private func tweak(_ id: String) -> Tweak {
         let results = Catalog.search(query, in: Catalog.tweaks(home: home))
         #expect(results.contains { $0.id == expectedID }, "\(query) should find \(expectedID)")
         #expect(results.prefix(3).contains { $0.id == expectedID }, "\(expectedID) should rank near the top for \(query)")
+    }
+
+    @Test func `every search synonym names a real setting`() {
+        let ids = Set(Catalog.tweaks(home: home).map(\.id))
+        #expect(Set(Catalog.synonyms.keys).subtracting(ids).isEmpty)
     }
 
     @Test func `title and category matches rank ahead of incidental section matches`() {

@@ -54,7 +54,9 @@ public enum PreferenceValue: Hashable, Sendable, Codable {
     }
 
     private static func format(_ value: Double) -> String {
-        value == value.rounded() ? String(Int(value)) : String(value)
+        // `Int(exactly:)` is nil for infinity and values past `Int`'s range,
+        // which a hand-edited preference can hold; `Int(_:)` would crash.
+        Int(exactly: value).map(String.init) ?? String(value)
     }
 }
 

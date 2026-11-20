@@ -481,6 +481,56 @@ import Testing
         }
     }
 
+    @Test(.timeLimit(.minutes(1)))
+    func `an app with thousands of read-only files installs without stalling`() async throws {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let installer = try installer()
+
+        // Marking each read-only file fails with a line of output, far more
+        // in all than a pipe holds.
+        let source = root.appending(path: "manysrc", directoryHint: .isDirectory)
+        let bundle = source.appending(path: "Many.app", directoryHint: .isDirectory)
+        try makeBundle(at: bundle)
+        let resources = bundle.appending(path: "Contents/Resources", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
+        for index in 0..<2_000 {
+            let file = resources.appending(path: "resource-\(index).txt")
+            try Data("x".utf8).write(to: file)
+            chmod(file.path(percentEncoded: false), 0o444)
+        }
+        let zip = root.appending(path: "many.zip")
+        try run("/usr/bin/ditto", "-c", "-k", source.path(percentEncoded: false), zip.path(percentEncoded: false))
+
+        let app = StoreApp(
+            id: "many", name: "Many", summary: "", homepage: nil, version: "1.0", downloadURL: zip, checksum: nil,
+            bundles: [.init(source: "Many.app", installedName: "Many.app")], minimumSystem: nil, updatesItself: false
+        )
+        try await installer.install(app) { _ in }
+        let last = installer.applications.appending(path: "Many.app/Contents/Resources/resource-1999.txt")
+        #expect(FileManager.default.fileExists(atPath: last.path(percentEncoded: false)))
+    }
+
+    @Test func `only real GitHub addresses are used for the owner's picture`() async {
+        actor Requests {
+            var addresses: [String] = []
+            func add(_ url: URL) { addresses.append(url.absoluteString) }
+        }
+        let requests = Requests()
+        let lookalike = StoreApp(
+            id: "lookalike", name: "Lookalike", summary: "", homepage: URL(string: "https://notgithub.com/someone/"),
+            version: "1.0", downloadURL: URL(string: "https://github.com/maker/tool/releases/download/v1/Tool.zip")!,
+            checksum: nil, bundles: [.init(source: "Tool.app", installedName: "Tool.app")], minimumSystem: nil, updatesItself: false
+        )
+        _ = await IconFinder.lookup(for: lookalike) { url in
+            await requests.add(url)
+            return (Data(), 404)
+        }
+        let asked = await requests.addresses
+        #expect(asked.contains("https://github.com/maker.png?size=256"))
+        #expect(!asked.contains("https://github.com/someone.png?size=256"))
+        #expect(asked.contains("https://notgithub.com/favicon.ico"), "a look-alike host is still the maker's own site")
+    }
+
     @Test func `offline icon lookups do not poison the disk cache and negative markers expire`() async throws {
         defer { try? FileManager.default.removeItem(at: root) }
         let cache = root.appending(path: "Icons", directoryHint: .isDirectory)

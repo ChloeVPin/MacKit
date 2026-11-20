@@ -14,8 +14,8 @@ struct CategoryView: View {
         case section(String)
     }
 
-    /// The filter in effect. "Changed" with nothing left under it falls back
-    /// to everything.
+    /// The filter in effect. "Customized" with nothing left under it falls
+    /// back to everything.
     private var shown: Filter {
         filter == .changed && model.customizedCount(in: category) == 0 ? .all : filter
     }
@@ -40,11 +40,22 @@ struct CategoryView: View {
                 FullDiskAccessNotice()
             }
 
+            if tweaks.isEmpty {
+                // Every setting here depends on hardware this Mac doesn't have.
+                EmptyState(
+                    symbol: category.symbol,
+                    title: "Nothing to change on this Mac",
+                    message: "These settings are for hardware this Mac doesn't have."
+                )
+            }
+
             if sections.count > 1 || customized > 0 {
                 ChipBar {
                     chip("All", .all)
                     if customized > 0 {
-                        chip("Changed", .changed, count: customized)
+                        // The same word as the count on Home: settings that
+                        // differ from the default, not changes waiting for review.
+                        chip("Customized", .changed, count: customized)
                     }
                     if sections.count > 1 {
                         ForEach(sections, id: \.self) { section in
@@ -62,7 +73,6 @@ struct CategoryView: View {
                 }
             })
         }
-        .onChange(of: category) { self.filter = .all }
     }
 
     private func chip(_ title: String, _ value: Filter, count: Int? = nil) -> some View {
@@ -83,19 +93,15 @@ struct SearchResultsView: View {
             if results.isEmpty {
                 EmptyState(
                     symbol: "magnifyingglass",
-                    title: "No results for “\(query)”",
+                    title: "No settings match “\(query)”",
                     message: "Try a broader word, like “dock” or “screenshot”."
                 )
             } else {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Results")
-                        .text(.title)
-                    Text("\(results.count) \(results.count == 1 ? "setting matches" : "settings match") “\(query)”")
-                        .text(.body)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
+                PageHeader(
+                    symbol: "magnifyingglass",
+                    title: "Results",
+                    subtitle: "\(results.count) \(results.count == 1 ? "setting matches" : "settings match") “\(query)”"
+                )
                 TweakSections(tweaks: results, showsCategory: true)
             }
         }

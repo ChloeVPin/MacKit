@@ -133,7 +133,7 @@ public enum IconFinder {
 
         let homepage = app.homepage
         let host = homepage?.host(percentEncoded: false)
-        let onGitHub = host == "github.com" || host == "www.github.com"
+        let onGitHub = isGitHub(host)
 
         if let homepage, let host, !onGitHub {
             list.append { await declaredIcon(on: homepage, fetch: fetch) }
@@ -141,7 +141,7 @@ public enum IconFinder {
         }
         // A project's page on GitHub carries GitHub's own logo. Its owner's
         // picture says more about the app.
-        for url in [homepage, app.downloadURL].compactMap(\.self) where url.host(percentEncoded: false)?.hasSuffix("github.com") == true {
+        for url in [homepage, app.downloadURL].compactMap(\.self) where isGitHub(url.host(percentEncoded: false)) {
             if let owner = url.pathComponents.dropFirst().first {
                 image("https://github.com/\(owner).png?size=256", .github)
                 break
@@ -153,6 +153,13 @@ public enum IconFinder {
             image("https://icons.duckduckgo.com/ip3/\(host).ico", .favicon)
         }
         return list
+    }
+
+    /// Whether `host` is GitHub itself, not merely a name ending in the
+    /// same letters, such as `notgithub.com`.
+    private static func isGitHub(_ host: String?) -> Bool {
+        guard let host = host?.lowercased() else { return false }
+        return host == "github.com" || host.hasSuffix(".github.com")
     }
 
     // MARK: Sources

@@ -85,8 +85,9 @@ extension Tweak {
         let text = String(id.dropFirst(Self.entryPrefix.count))
         switch input {
         case .number(let number):
-            guard let value = Double(text) else { return nil }
-            return number.isInteger ? .int(Int(value.rounded())) : .double(value)
+            guard let value = Double(text), value.isFinite else { return nil }
+            guard number.isInteger else { return .double(value) }
+            return Int(exactly: value.rounded()).map(PreferenceValue.int)
         case .text:
             return .string(text)
         }

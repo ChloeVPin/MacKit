@@ -46,7 +46,7 @@ struct ChangesBar: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, Space.s)
-                .help("Discard all changes (⌘⌫)")
+                .help("Discard all changes (⌥⌘⌫)")
 
                 Button {
                     model.beginReview()

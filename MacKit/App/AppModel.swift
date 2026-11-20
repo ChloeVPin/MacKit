@@ -21,8 +21,9 @@ enum Destination: Hashable {
 /// The app's state: what this Mac is set to, what the user has chosen to
 /// change, and what has been applied before.
 ///
-/// Flipping a switch never changes the system. It marks a pending change, and
-/// nothing is written until the user reviews and applies the whole set.
+/// Small, safe settings are written the moment they change. Anything
+/// weightier becomes a pending change, and nothing of those is written until
+/// the user reviews and applies the whole set.
 @Observable
 final class AppModel {
     private(set) var tweaks: [Tweak]
@@ -379,6 +380,13 @@ final class AppModel {
         searchText = ""
         destination = .category(tweak.category)
         openTweakID = tweak.id
+    }
+
+    /// Opens an app's page in the store. Clears the search, the way opening
+    /// a setting does, because the page can't show while results are up.
+    func openApp(_ id: StoreApp.ID) {
+        searchText = ""
+        store.openAppID = id
     }
 
     func go(to destination: Destination) {

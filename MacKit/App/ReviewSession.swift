@@ -54,12 +54,4 @@ final class ReviewSession: Identifiable {
             if case .finished(.failed) = $0 { true } else { false }
         }
     }
-
-    /// Rows grouped by category, in the order the categories appear in the app.
-    var groups: [(category: TweakCategory, rows: [Row])] {
-        TweakCategory.allCases.compactMap { category in
-            let matching = rows.filter { $0.change.tweak.category == category }
-            return matching.isEmpty ? nil : (category, matching)
-        }
-    }
 }

@@ -1,0 +1,26 @@
+name: Something isn't right
+description: A setting that doesn't apply, reads wrong, or won't undo, or an app that won't install.
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead. For a setting, its name as MacKit shows it. For an app, its name in the store.
+    validations:
+      required: true
+  - type: input
+    id: mackit
+    attributes:
+      label: MacKit version
+      description: MacKit › About MacKit.
+      placeholder: "0.1.1"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      description: Apple menu › About This Mac.
+      placeholder: "27.2"
+    validations:
+      required: true

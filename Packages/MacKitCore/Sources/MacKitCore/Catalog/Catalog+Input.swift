@@ -31,11 +31,6 @@ extension Catalog {
         [("off", "Off", .int(0)), ("on", "On", .int(on))]
     }
 
-    private static let speeds: [(id: TweakOption.ID, label: String, value: PreferenceValue)] = [
-        ("slowest", "Slowest", .double(0.5)), ("slow", "Slow", .double(0.6875)), ("standard", "Standard", .double(1)),
-        ("fast", "Fast", .double(1.5)), ("faster", "Faster", .double(2)), ("fastest", "Fastest", .double(3)),
-    ]
-
     static let trackpadAndMouse: [Tweak] = [
         // Point and click
         trackpad("tap-to-click", "Tap to click", "Tap with one finger instead of pressing down.", "Point and Click", "Clicking",

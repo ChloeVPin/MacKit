@@ -111,7 +111,9 @@ private struct EntryRow: View {
                     Text("Can't undo")
                         .text(.detail)
                         .foregroundStyle(.tertiary)
-                        .help("MacKit couldn't read this setting's earlier value, so there's nothing exact to put back.")
+                        .help(entry.canRevert
+                            ? "This setting isn't available on this Mac."
+                            : "MacKit couldn't read this setting's earlier value, so there's nothing exact to put back.")
                 }
             }
             // The text column takes priority, so anything trailing has to

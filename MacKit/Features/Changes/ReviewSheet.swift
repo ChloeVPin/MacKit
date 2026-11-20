@@ -194,6 +194,16 @@ struct ReviewSheet: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
+                // Escape closes the finished sheet too, as it does before
+                // anything runs. A button can hold only one shortcut, so this
+                // one is invisible.
+                .background {
+                    Button("Close") { model.review = nil }
+                        .keyboardShortcut(.cancelAction)
+                        .opacity(0)
+                        .focusable(false)
+                        .accessibilityHidden(true)
+                }
             }
         }
         .controlSize(.large)

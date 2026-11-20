@@ -158,28 +158,65 @@ public struct AllowlistedCommandRunner: CommandRunning {
         process.standardError = errorPipe
         process.standardInput = FileHandle.nullDevice
 
-        let exitCode: Int32
+        let result: (status: Int32, outputs: [Data])
         do {
-            exitCode = try await withCheckedThrowingContinuation { continuation in
-                process.terminationHandler = { finished in
-                    continuation.resume(returning: finished.terminationStatus)
-                }
-                do {
-                    try process.run()
-                } catch {
-                    process.terminationHandler = nil
-                    continuation.resume(throwing: error)
-                }
-            }
+            result = try await process.runReadingOutput(of: [outputPipe, errorPipe])
         } catch {
             throw .launchFailed(command: command.shellText, message: error.localizedDescription)
         }
+        return CommandOutput(
+            exitCode: result.status,
+            standardOutput: String(decoding: result.outputs[0], as: UTF8.self),
+            standardError: String(decoding: result.outputs[1], as: UTF8.self)
+        )
+    }
+}
 
-        // The commands MacKit runs print a line or two, well under the pipe
-        // buffer, so reading after exit cannot deadlock.
-        let output = String(decoding: outputPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        let errorOutput = String(decoding: errorPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        return CommandOutput(exitCode: exitCode, standardOutput: output, standardError: errorOutput)
+extension Process {
+    /// Launches the process and waits for it to exit, reading `pipes` while
+    /// it runs.
+    ///
+    /// Reading only after exit hangs as soon as a tool prints more than a
+    /// pipe holds (64 KB): the tool waits for room that never comes, and
+    /// never exits.
+    ///
+    /// - Returns: The exit status, and everything written to each pipe, in
+    ///   the order the pipes were given.
+    func runReadingOutput(of pipes: [Pipe]) async throws -> (status: Int32, outputs: [Data]) {
+        let (exits, exited) = AsyncStream.makeStream(of: Int32.self)
+        terminationHandler = { finished in
+            exited.yield(finished.terminationStatus)
+            exited.finish()
+        }
+        do {
+            try run()
+        } catch {
+            terminationHandler = nil
+            throw error
+        }
+        // Every pipe is read at once: a tool can fill one while MacKit
+        // waits on another.
+        let readers = pipes.map { pipe in
+            let handle = pipe.fileHandleForReading
+            return Task { await handle.dataUntilClosed() }
+        }
+        var status: Int32 = -1
+        for await code in exits { status = code }
+        var outputs: [Data] = []
+        for reader in readers { outputs.append(await reader.value) }
+        return (status, outputs)
+    }
+}
+
+extension FileHandle {
+    /// Everything written until the last writer closes, read on a
+    /// background thread so the caller isn't blocked.
+    fileprivate func dataUntilClosed() async -> Data {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: self.readDataToEndOfFile())
+            }
+        }
     }
 }
 

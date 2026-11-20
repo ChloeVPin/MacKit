@@ -46,7 +46,7 @@ Building it yourself needs macOS 27 and Xcode 27.
 Open `MacKit.xcodeproj` and press Run, or build from Terminal:
 
 ```bash
-xcodebuild -project MacKit.xcodeproj -scheme MacKit -derivedDataPath build build
+xcodebuild -project MacKit.xcodeproj -scheme MacKit -configuration Debug -derivedDataPath build build
 ```
 
 ```bash
@@ -63,7 +63,7 @@ open build/Build/Products/Debug/MacKit.app --args -sample 1
 
 ## How it stays safe
 
-- **Only known settings.** The catalog is a fixed list in the source. MacKit never downloads or runs scripts, and it can only launch a short allowlist of system tools.
+- **Only known settings.** The catalog is a fixed list in the source. MacKit never downloads or runs scripts, and it only launches a fixed list of the system's own tools.
 - **Your password stays with macOS.** Administrator changes go through the system's own prompt, once per batch. One failed change never stops or hides the others.
 - **Downloads are treated as untrusted.** HTTPS only, checksum verified when the catalog has one, marked as downloaded, and confirmed by Gatekeeper before anything in Applications is replaced. The copy being replaced goes to the Trash, not away.
 - **Everything is in the open.** Every setting, the command it runs, and the tests behind it are in this repository.
@@ -73,8 +73,11 @@ open build/Build/Products/Debug/MacKit.app --args -sample 1
 ```
 MacKit/                  The app (SwiftUI)
 Packages/MacKitCore/     The engine: catalog, planning, apply, undo, installer. No UI.
-Tools/                   Scripts that draw the app icon and the brand images
+Tools/                   Scripts that draw the app icon and brand images, and pack the disk image
 Brand/Allo/              The wordmark's font, with its license
+Docs/                    README images and the social preview
+Archive/                 Parked experiments, not part of the build
+.github/workflows/       Tests and a build for each push; a release for each version tag
 ```
 
 Run the engine's tests. They use an in-memory Mac and locally built fake apps, so nothing real is touched:
@@ -87,11 +90,11 @@ swift test --package-path Packages/MacKitCore
 
 Early, and honest about it:
 
-- **Unsigned.** There is no Developer ID yet, so macOS will warn on first launch of a copied build.
+- **Unsigned.** There is no Developer ID yet, so macOS will warn the first time you open a downloaded copy.
 - **Administrator changes** are tested on a real system for power settings and system preference files. Touch ID for sudo has not been confirmed end to end.
-- **The app store** is tested with locally built apps only.
+- **The app store's** automated tests use locally built apps only. Real installs have had light use.
 
-Issues and pull requests are welcome. `PLAN.md` has the full history and what comes next.
+Issues and pull requests are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) explains how to work without touching your own settings. `PLAN.md` has the full history and what comes next.
 
 ## License
 

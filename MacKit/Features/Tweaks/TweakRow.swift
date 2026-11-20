@@ -49,8 +49,8 @@ struct TweakRow: View {
                         .contentShape(.circle)
                 }
                 .buttonStyle(PressableStyle())
-                .help("Undo this change")
-                .accessibilityLabel("Undo change to \(tweak.title)")
+                .help("Discard this change")
+                .accessibilityLabel("Discard change to \(tweak.title)")
                 .transition(reduceMotion ? AnyTransition.opacity : .scale(scale: 0.85).combined(with: .opacity))
             }
 
@@ -78,7 +78,7 @@ struct TweakRow: View {
         .animation(reduceMotion ? Motion.fade : Motion.state, value: isPending)
         .contextMenu {
             if isPending {
-                Button("Undo This Change") { model.clearPending(tweak) }
+                Button("Discard This Change") { model.clearPending(tweak) }
             }
             if let stock = tweak.stockOption, tweak.hasDefault, model.selectedOption(for: tweak) != stock.id {
                 Button("Reset to Default (\(stock.label))") {

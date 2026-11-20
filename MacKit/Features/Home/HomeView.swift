@@ -18,6 +18,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Quick Setups")
                         .font(.system(size: 17, weight: .semibold))
+                        .accessibilityAddTraits(.isHeader)
                     Text("Pick a starting point. Nothing changes until you review it.")
                         .text(.body)
                         .foregroundStyle(.secondary)
@@ -116,7 +117,9 @@ private struct SetupCard: View {
                 HStack(alignment: .top) {
                     IconTile(symbol: setup.category.symbol, size: 32)
                     Spacer()
-                    statusBadge(status)
+                    if model.isLoaded {
+                        statusBadge(status)
+                    }
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(setup.title)
@@ -143,11 +146,14 @@ private struct SetupCard: View {
             .contentShape(shape)
         }
         .buttonStyle(PressableStyle())
-        .disabled(status == .alreadySet)
+        // Until the Mac has been read, every setting looks unset, so the
+        // counts would be wrong and a click could select settings that are
+        // already in place.
+        .disabled(status == .alreadySet || !model.isLoaded)
         .onHover { isHovered = $0 }
         .animation(Motion.fade, value: isHovered)
         .accessibilityLabel("\(setup.title). \(setup.summary)")
-        .accessibilityValue(accessibilityValue(status))
+        .accessibilityValue(model.isLoaded ? accessibilityValue(status) : "")
     }
 
     private func isSelected(_ status: AppModel.SetupStatus) -> Bool {
@@ -167,7 +173,7 @@ private struct SetupCard: View {
                 .foregroundStyle(Color.accentColor)
                 .transition(reduceMotion ? AnyTransition.opacity : .scale(scale: 0.85).combined(with: .opacity))
         case .available(let changes):
-            Text("\(changes) \(changes == 1 ? "change" : "changes")")
+            Text(Self.changes(changes))
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, Space.s)
@@ -179,8 +185,12 @@ private struct SetupCard: View {
     private func accessibilityValue(_ status: AppModel.SetupStatus) -> String {
         switch status {
         case .alreadySet: "Already set"
-        case .selected(let changes): "Selected, \(changes) changes"
-        case .available(let changes): "\(changes) changes"
+        case .selected(let changes): "Selected, \(Self.changes(changes))"
+        case .available(let changes): Self.changes(changes)
         }
+    }
+
+    private static func changes(_ count: Int) -> String {
+        "\(count) \(count == 1 ? "change" : "changes")"
     }
 }

@@ -116,7 +116,7 @@ public struct AppInstaller: Sendable {
         let contents = work.appending(path: "contents", directoryHint: .isDirectory)
         let mounted = try await Self.open(download, into: contents)
         defer {
-            if mounted { Self.runDetached("/usr/bin/hdiutil", ["detach", contents.path(percentEncoded: false), "-force", "-quiet"]) }
+            if mounted { Self.runAndWait("/usr/bin/hdiutil", ["detach", contents.path(percentEncoded: false), "-force", "-quiet"]) }
         }
         if Task.isCancelled { throw .cancelled }
 
@@ -371,21 +371,16 @@ public struct AppInstaller: Sendable {
         process.standardOutput = pipe
         process.standardError = pipe
         process.standardInput = FileHandle.nullDevice
-        let status: Int32 = await withCheckedContinuation { continuation in
-            process.terminationHandler = { continuation.resume(returning: $0.terminationStatus) }
-            do {
-                try process.run()
-            } catch {
-                process.terminationHandler = nil
-                continuation.resume(returning: -1)
-            }
-        }
-        let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        return (status, output.trimmingCharacters(in: .whitespacesAndNewlines))
+        // `xattr -r` prints a line for every read-only file it can't mark,
+        // which for a large app is far more than a pipe holds.
+        guard let result = try? await process.runReadingOutput(of: [pipe]) else { return (-1, "") }
+        let output = String(decoding: result.outputs[0], as: UTF8.self)
+        return (result.status, output.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    /// Starts a tool without waiting, for cleanup that runs as a scope ends.
-    private static func runDetached(_ tool: String, _ arguments: [String]) {
+    /// Runs a tool and waits for it, for cleanup in a `defer`, which can't
+    /// `await`. Ejecting has to finish before the work folder is removed.
+    private static func runAndWait(_ tool: String, _ arguments: [String]) {
         let process = Process()
         process.executableURL = URL(filePath: tool)
         process.arguments = arguments

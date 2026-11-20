@@ -3,7 +3,7 @@ import Foundation
 extension Catalog {
     /// Common words people search for that don't appear in a setting's own
     /// title or summary.
-    private static let synonyms: [Tweak.ID: String] = [
+    static let synonyms: [Tweak.ID: String] = [
         "appearance.mode": "dark mode light mode night theme",
         "appearance.glass-tint": "frosted blur transparency",
         "appearance.corners": "rounded radius square",
@@ -35,7 +35,11 @@ extension Catalog {
     /// "mouse speed", or "safari url"), and options and preference keys are
     /// searched alongside plain-English text.
     public static func search(_ query: String, in tweaks: [Tweak], locale: Locale = .current) -> [Tweak] {
-        let foldedQuery = fold(query.trimmingCharacters(in: .whitespacesAndNewlines), locale: locale)
+        // `locale` is kept for source compatibility. Folding ignores it so
+        // English titles such as "Icon size" match in every locale,
+        // including Turkish and Azerbaijani with their dotted and dotless I.
+        _ = locale
+        let foldedQuery = fold(query.trimmingCharacters(in: .whitespacesAndNewlines))
         let tokens = foldedQuery.split(whereSeparator: \.isWhitespace).map(String.init)
         guard !tokens.isEmpty else { return [] }
 
@@ -43,7 +47,7 @@ extension Catalog {
         scored.reserveCapacity(32)
 
         for (index, tweak) in tweaks.enumerated() {
-            if let score = score(of: tweak, foldedQuery: foldedQuery, tokens: tokens, locale: locale) {
+            if let score = score(of: tweak, foldedQuery: foldedQuery, tokens: tokens) {
                 scored.append((index, score, tweak))
             }
         }
@@ -55,16 +59,16 @@ extension Catalog {
         return scored.map(\.tweak)
     }
 
-    private static func score(of tweak: Tweak, foldedQuery: String, tokens: [String], locale: Locale) -> Int? {
-        let title = fold(tweak.title, locale: locale)
+    private static func score(of tweak: Tweak, foldedQuery: String, tokens: [String]) -> Int? {
+        let title = fold(tweak.title)
         let titleWords = words(in: title)
-        let location = fold("\(tweak.category.title) \(tweak.category.rawValue) \(tweak.section)", locale: locale)
+        let location = fold("\(tweak.category.title) \(tweak.category.rawValue) \(tweak.section)")
         let locationWords = words(in: location)
-        let options = fold(tweak.options.map(\.label).joined(separator: " "), locale: locale)
+        let options = fold(tweak.options.map(\.label).joined(separator: " "))
         let optionWords = words(in: options)
-        let summary = fold(tweak.caution.map { "\(tweak.summary) \($0)" } ?? tweak.summary, locale: locale)
+        let summary = fold(tweak.caution.map { "\(tweak.summary) \($0)" } ?? tweak.summary)
         let summaryWords = words(in: summary)
-        let technical = fold(technicalTerms(for: tweak), locale: locale)
+        let technical = fold(technicalTerms(for: tweak))
 
         var total = 0
         var allInTitle = true
@@ -139,11 +143,8 @@ extension Catalog {
         return parts.joined(separator: " ")
     }
 
-    private static func fold(_ text: String, locale: Locale) -> String {
-        // Use locale-independent folding and unify Turkish dotted/dotless I so
-        // English catalog titles like "Icon size" always match in every locale.
-        _ = locale
-        return text
+    private static func fold(_ text: String) -> String {
+        text
             .replacing("ı", with: "i")
             .replacing("İ", with: "i")
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
